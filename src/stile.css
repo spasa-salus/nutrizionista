@@ -22,7 +22,7 @@
   --smusso-medio: 22px;
   --smusso-grande: 28px;
 
-  --arrotondato: ui-rounded, 'SF Pro Rounded', 'Nunito', system-ui, sans-serif;
+  --arrotondato: ui-rounded, 'SF Pro Rounded', 'Nunito Variable', system-ui, sans-serif;
   --stampa: ui-monospace, 'SF Mono', 'Menlo', monospace;
   color-scheme: light;
 }

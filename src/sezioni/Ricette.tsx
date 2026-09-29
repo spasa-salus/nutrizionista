@@ -1,15 +1,90 @@
-import { useState } from 'react'
-import { ArrowDown, ArrowUp, Clock, Plus, Users, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowDown, ArrowUp, Clock, Plus, Sparkles, Users, X } from 'lucide-react'
+import { chiama } from '../api'
 import { cerca, type Ingrediente, MOMENTI, perNome, type Ricetta, slug, TAG, UNITA } from '../dominio'
-import { BottoneNuovo, Campo, Cerca, Foglio, Intestazione, Pastiglie, PiedeModifica, Reparto, Stato, useBozza, useContenuto } from '../ui'
+import { BottoneNuovo, Campo, Cerca, Foglio, Intestazione, Pastiglie, PiedeModifica, Reparto, Stato, useBozza, useContenuto, useNotifica } from '../ui'
 
 const VUOTA: Ricetta = {
   id: '', nome: '', descrizione: '', ingredienti: [], carrelli: [], tag: [],
   minutiPreparazione: 20, porzioni: 2, passaggi: [], momento: 'pranzo',
 }
 
+// Proposta dell'AI sui carrelli di una ricetta (funzione admin, ricette_ai.ts): solo quelle che
+// cambiano qualcosa. Sposta l'ordine della griglia di un carrello, non chi puo' mangiare cosa.
+type Proposta = { ricettaId: string; carrelli: string[]; attuali: string[]; confidenza: number; motivo: string }
+type Revisione = { revisione: number; soglia: number; proposte: Proposta[] }
+
+function RevisioneAI({ onChiudi }: { onChiudi: () => void }) {
+  const { contenuto, ricarica } = useContenuto()
+  const notifica = useNotifica()
+  const [dati, impostaDati] = useState<Revisione | null>(null)
+  const [errore, impostaErrore] = useState<string | null>(null)
+  const [scelte, impostaScelte] = useState<Set<string>>(new Set())
+  const [inCorso, impostaInCorso] = useState(false)
+  useEffect(() => {
+    chiama<Revisione>('ai.ricette.carrelli').then((r) => {
+      impostaDati(r)
+      impostaScelte(new Set(r.proposte.filter((p) => p.confidenza >= r.soglia).map((p) => p.ricettaId)))
+    }, (e) => impostaErrore(e.message))
+  }, [])
+  const nome = (id: string) => contenuto?.ricette.find((r) => r.id === id)?.nome ?? id
+  const carrello = (id: string) => contenuto?.carrelli.find((c) => c.id === id)?.nome ?? id
+  const elenco = (ids: string[]) => ids.length ? ids.map(carrello).join(', ') : 'nessuno'
+  const alterna = (id: string) => impostaScelte((s) => {
+    const n = new Set(s)
+    if (n.has(id)) n.delete(id)
+    else n.add(id)
+    return n
+  })
+
+  async function applica() {
+    if (!dati) return
+    impostaInCorso(true)
+    try {
+      const modifiche = dati.proposte.filter((p) => scelte.has(p.ricettaId)).map(({ ricettaId, carrelli }) => ({ ricettaId, carrelli }))
+      const r = await chiama<{ revisione: number }>('ai.ricette.applica', { revisione: dati.revisione, modifiche })
+      notifica(`Pubblicato · revisione ${r.revisione}`)
+      ricarica()
+      onChiudi()
+    } catch (e) {
+      notifica((e as Error).message, true)
+    } finally {
+      impostaInCorso(false)
+    }
+  }
+
+  return (
+    <Foglio titolo="Carrelli delle ricette: proposte dell'AI" onChiudi={onChiudi}
+      piede={<button className="bottone" disabled={inCorso || !scelte.size} onClick={applica}>
+        {inCorso ? 'Pubblico…' : `Applica ${scelte.size} ${scelte.size === 1 ? 'modifica' : 'modifiche'}`}
+      </button>}>
+      <p className="tenue piccolo" style={{ margin: 0 }}>
+        Sono già spuntate le proposte di cui l'AI è sicura. Chi può mangiare una ricetta lo decidono sempre i suoi ingredienti.
+      </p>
+      <Stato caricamento={!dati && !errore} errore={errore} vuoto={dati?.proposte.length === 0}>
+        <div className="elenco">
+          {dati?.proposte.map((p) => (
+            <label key={p.ricettaId} className="scheda cliccabile">
+              <input type="checkbox" checked={scelte.has(p.ricettaId)} onChange={() => alterna(p.ricettaId)} />
+              <div className="principale">
+                <div className="nome">{nome(p.ricettaId)}</div>
+                <div className="tenue piccolo">Ora: {elenco(p.attuali)} → proposta: <strong>{elenco(p.carrelli)}</strong></div>
+                <div className="riga">
+                  <span className="etichetta">AI {Math.round(p.confidenza * 100)}%</span>
+                  {p.motivo && <span className="tenue piccolo">{p.motivo}</span>}
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </Stato>
+    </Foglio>
+  )
+}
+
 export default function Ricette() {
   const { contenuto, errore, salva, elimina } = useContenuto()
+  const [revisioneAI, impostaRevisioneAI] = useState(false)
   const { bozza, apri, chiudi, cambia, inCorso, esegui } = useBozza<Ricetta>()
   const [filtro, impostaFiltro] = useState('')
   const [momento, impostaMomento] = useState('')
@@ -22,7 +97,13 @@ export default function Ricette() {
   return (
     <>
       <Intestazione titolo="Ricette" sottotitolo={`${contenuto?.ricette.length ?? 0} ricette nel ricettario`}
-        azione={<BottoneNuovo testo="Nuova ricetta" onClick={() => apri(VUOTA, true)} />} />
+        azione={<span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="bottone secondario" onClick={() => impostaRevisioneAI(true)}>
+            <Sparkles size={16} aria-hidden /> Carrelli con l'AI
+          </button>
+          <BottoneNuovo testo="Nuova ricetta" onClick={() => apri(VUOTA, true)} />
+        </span>} />
+      {revisioneAI && <RevisioneAI onChiudi={() => impostaRevisioneAI(false)} />}
       <div className="barra">
         <Cerca valore={filtro} onCambia={impostaFiltro} segnaposto="Cerca una ricetta" />
         <select className="select" style={{ width: 'auto' }} value={momento} onChange={(e) => impostaMomento(e.target.value)} aria-label="Momento">

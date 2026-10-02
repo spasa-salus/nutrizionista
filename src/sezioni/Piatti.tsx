@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Flag, Heart, ImageUp, ShieldAlert } from 'lucide-react'
 import { chiama } from '../api'
 import { cerca, data, perNome } from '../dominio'
-import { Campo, BottoneNuovo, Cerca, Foglio, Intestazione, PiedeModifica, Stato, useBozza, useContenuto, useElenco, useNotifica } from '../ui'
+import { BottoneElimina, Campo, BottoneNuovo, Cerca, Foglio, Intestazione, PiedeModifica, Stato, useBozza, useContenuto, useElenco, useNotifica } from '../ui'
+
+// Solo gli account di redazione (utenti.autori): i post degli utenti veri non si scrivono a nome loro.
 type Utente = { id: string; email: string; nome_utente: string | null }
 
 type Piatto = {
@@ -10,6 +12,7 @@ type Piatto = {
   ricetta_id: string; ricetta_nome: string; foto: string; fotoUrl: string; didascalia: string
   creato_il: string; mi_piace: number; segnalazioni: number
   moderazione: Moderazione; motivo_moderazione: string | null; deciso_da: 'ai' | 'admin' | null
+  redazione: boolean
 }
 type Bozza = {
   id?: string; utenteId: string; ricettaId: string; didascalia: string; foto?: string; anteprima?: string
@@ -65,6 +68,7 @@ export default function Piatti() {
     .filter((p) => !soloDaRivedere || p.moderazione === 'nascosto' || p.moderazione === 'da_rivedere')
   const conProfilo = (utenti ?? []).filter((u) => u.nome_utente)
   const ricette = [...(contenuto?.ricette ?? [])].sort(perNome)
+  const modificabile = !!bozza && (bozza.nuovo || !!righe?.find((p) => p.id === bozza.valore.id)?.redazione)
 
   const azione = (nome: string, parametri: object, messaggio: string) => esegui(async () => {
     try {
@@ -128,7 +132,7 @@ export default function Piatti() {
       </Stato>
 
       {bozza && (
-        <Foglio titolo={bozza.nuovo ? 'Nuovo post' : 'Modifica post'} onChiudi={chiudi}
+        <Foglio titolo={bozza.nuovo ? 'Nuovo post' : modificabile ? 'Modifica post' : 'Post di un utente'} onChiudi={chiudi}
           piede={<>
             {!bozza.nuovo && ((bozza.valore.segnalazioni ?? 0) > 0 || bozza.valore.moderazione !== 'ok') && (
               <button className="bottone secondario" disabled={inCorso}
@@ -136,22 +140,25 @@ export default function Piatti() {
                 Approva e mostra a tutti
               </button>
             )}
-            <PiedeModifica inCorso={inCorso}
+            {!modificabile && <><BottoneElimina disabilitato={inCorso}
+              onConferma={() => azione('piatti.elimina', { id: bozza.valore.id }, 'Post eliminato')} /><div className="spazio" /></>}
+            {modificabile && <PiedeModifica inCorso={inCorso}
               testoSalva="Salva"
               onSalva={() => {
                 if (bozza.nuovo && !bozza.valore.foto) return notifica('Scegli una foto', true)
                 const { anteprima: _, segnalazioni: __, moderazione: ___, ...dati } = bozza.valore
                 azione('piatti.salva', dati, 'Post salvato')
               }}
-              onElimina={bozza.nuovo ? undefined : () => azione('piatti.elimina', { id: bozza.valore.id }, 'Post eliminato')} />
+              onElimina={bozza.nuovo ? undefined : () => azione('piatti.elimina', { id: bozza.valore.id }, 'Post eliminato')} />}
           </>}>
           {bozza.valore.anteprima && <img className="anteprima-foto" src={bozza.valore.anteprima} alt="Anteprima" />}
-          <label className="bottone secondario" style={{ justifySelf: 'start' }}>
+          {!modificabile && <p className="tenue" style={{ margin: 0 }}>L'ha scritto un utente: puoi approvarlo o eliminarlo, non modificarlo.</p>}
+          {modificabile && <label className="bottone secondario" style={{ justifySelf: 'start' }}>
             <ImageUp size={18} /> {bozza.valore.anteprima ? 'Cambia foto' : 'Scegli foto'}
             <input type="file" accept="image/*" hidden onChange={(e) => scegliFoto(e.target.files?.[0])} />
-          </label>
+          </label>}
           {bozza.nuovo ? (
-            <Campo etichetta="Autore" aiuto="Solo utenti con un nome utente della community">
+            <Campo etichetta="Autore" aiuto="Solo account di redazione (creati dal pannello) con un nome utente">
               <select className="select" value={bozza.valore.utenteId} onChange={(e) => cambia({ utenteId: e.target.value })}>
                 {conProfilo.map((u) => <option key={u.id} value={u.id}>@{u.nome_utente} · {u.email}</option>)}
               </select>
@@ -160,12 +167,12 @@ export default function Piatti() {
             <p className="tenue" style={{ margin: 0 }}>Di @{righe?.find((p) => p.id === bozza.valore.id)?.autore ?? '—'}</p>
           )}
           <Campo etichetta="Ricetta">
-            <select className="select" value={bozza.valore.ricettaId} onChange={(e) => cambia({ ricettaId: e.target.value })}>
+            <select className="select" disabled={!modificabile} value={bozza.valore.ricettaId} onChange={(e) => cambia({ ricettaId: e.target.value })}>
               {ricette.map((r) => <option key={r.id} value={r.id}>{r.nome}</option>)}
             </select>
           </Campo>
           <Campo etichetta="Descrizione">
-            <textarea className="area" maxLength={300} value={bozza.valore.didascalia} onChange={(e) => cambia({ didascalia: e.target.value })} />
+            <textarea className="area" disabled={!modificabile} maxLength={300} value={bozza.valore.didascalia} onChange={(e) => cambia({ didascalia: e.target.value })} />
           </Campo>
         </Foglio>
       )}

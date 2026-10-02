@@ -1,11 +1,12 @@
 import { type FormEvent, useEffect, useState } from 'react'
-import { BookOpen, LogOut, MessageCircleQuestion, Moon, Package, Camera, ShoppingBasket, Store, Sun } from 'lucide-react'
+import { BookOpen, Link2, LogOut, MessageCircleQuestion, Moon, Package, Camera, ShoppingBasket, Store, Sun } from 'lucide-react'
 import { chiama, salvaSessione, sessione } from './api'
 import { FornitoreContenuto, useNotifica } from './ui'
 import Carrelli from './sezioni/Carrelli'
 import Prodotti from './sezioni/Prodotti'
 import Ricette from './sezioni/Ricette'
 import Supermercati from './sezioni/Supermercati'
+import Associazioni from './sezioni/Associazioni'
 import Piatti from './sezioni/Piatti'
 import Domande from './sezioni/Domande'
 
@@ -15,6 +16,7 @@ const SEZIONI = [
     { id: 'prodotti', nome: 'Prodotti', icona: Package, vista: Prodotti },
     { id: 'ricette', nome: 'Ricette', icona: BookOpen, vista: Ricette },
     { id: 'supermercati', nome: 'Supermercati', icona: Store, vista: Supermercati },
+    { id: 'associazioni', nome: 'Associazioni', icona: Link2, vista: Associazioni },
   ] },
   { reparto: 'Community', voci: [
     { id: 'piatti', nome: 'Post community', icona: Camera, vista: Piatti },

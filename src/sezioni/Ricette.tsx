@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp, Clock, Plus, Sparkles, Users, X } from 'lucide-react'
 import { chiama } from '../api'
-import { cerca, type Ingrediente, MOMENTI, perNome, type Ricetta, slug, TAG, UNITA } from '../dominio'
+import { cerca, data, type Ingrediente, MOMENTI, perNome, type Ricetta, slug, TAG, UNITA } from '../dominio'
 import { BottoneNuovo, Campo, Cerca, Foglio, Intestazione, Pastiglie, PiedeModifica, Reparto, Stato, useBozza, useContenuto, useNotifica } from '../ui'
 
 const VUOTA: Ricetta = {
@@ -12,21 +12,41 @@ const VUOTA: Ricetta = {
 // Proposta dell'AI sui carrelli di una ricetta (funzione admin, ricette_ai.ts): solo quelle che
 // cambiano qualcosa. Sposta l'ordine della griglia di un carrello, non chi puo' mangiare cosa.
 type Proposta = { ricettaId: string; carrelli: string[]; attuali: string[]; confidenza: number; motivo: string }
-type Revisione = { revisione: number; soglia: number; proposte: Proposta[] }
+// stato dell'ultima richiesta all'AI (in batch: minuti, al massimo 24 ore); null = mai chiesto.
+type Revisione = { stato: 'in_corso' | 'concluso' | 'fallito'; creatoIl: string; conclusoIl: string | null; errore: string | null; soglia: number; proposte: Proposta[] } | null
 
 function RevisioneAI({ onChiudi }: { onChiudi: () => void }) {
   const { contenuto, ricarica } = useContenuto()
   const notifica = useNotifica()
-  const [dati, impostaDati] = useState<Revisione | null>(null)
+  const [dati, impostaDati] = useState<Revisione | undefined>(undefined)
   const [errore, impostaErrore] = useState<string | null>(null)
   const [scelte, impostaScelte] = useState<Set<string>>(new Set())
   const [inCorso, impostaInCorso] = useState(false)
+  const leggi = () => chiama<Revisione>('ai.ricette.stato').then((r) => {
+    impostaDati(r)
+    impostaScelte(new Set((r?.proposte ?? []).filter((p) => p.confidenza >= r!.soglia).map((p) => p.ricettaId)))
+  }, (e) => impostaErrore(e.message))
+  useEffect(() => { leggi() }, [])
+  // Mentre l'AI lavora si ricontrolla ogni minuto.
+  const aperto = dati?.stato === 'in_corso'
   useEffect(() => {
-    chiama<Revisione>('ai.ricette.carrelli').then((r) => {
-      impostaDati(r)
-      impostaScelte(new Set(r.proposte.filter((p) => p.confidenza >= r.soglia).map((p) => p.ricettaId)))
-    }, (e) => impostaErrore(e.message))
-  }, [])
+    if (!aperto) return
+    const t = setInterval(leggi, 60_000)
+    return () => clearInterval(t)
+  }, [aperto])
+
+  async function chiedi() {
+    impostaInCorso(true)
+    try {
+      await chiama('ai.ricette.carrelli')
+      notifica('Richiesta inviata: le proposte arrivano di solito in pochi minuti')
+      await leggi()
+    } catch (e) {
+      notifica((e as Error).message, true)
+    } finally {
+      impostaInCorso(false)
+    }
+  }
   const nome = (id: string) => contenuto?.ricette.find((r) => r.id === id)?.nome ?? id
   const carrello = (id: string) => contenuto?.carrelli.find((c) => c.id === id)?.nome ?? id
   const elenco = (ids: string[]) => ids.length ? ids.map(carrello).join(', ') : 'nessuno'
@@ -42,7 +62,7 @@ function RevisioneAI({ onChiudi }: { onChiudi: () => void }) {
     impostaInCorso(true)
     try {
       const modifiche = dati.proposte.filter((p) => scelte.has(p.ricettaId)).map(({ ricettaId, carrelli }) => ({ ricettaId, carrelli }))
-      const r = await chiama<{ revisione: number }>('ai.ricette.applica', { revisione: dati.revisione, modifiche })
+      const r = await chiama<{ revisione: number }>('ai.ricette.applica', { revisione: contenuto?.revisione, modifiche })
       notifica(`Pubblicato · revisione ${r.revisione}`)
       ricarica()
       onChiudi()
@@ -59,11 +79,19 @@ function RevisioneAI({ onChiudi }: { onChiudi: () => void }) {
         {inCorso ? 'Pubblico…' : `Applica ${scelte.size} ${scelte.size === 1 ? 'modifica' : 'modifiche'}`}
       </button>}>
       <p className="tenue piccolo" style={{ margin: 0 }}>
-        Sono già spuntate le proposte di cui l'AI è sicura. Chi può mangiare una ricetta lo decidono sempre i suoi ingredienti.
+        {dati?.stato === 'in_corso' && `L'AI sta preparando le proposte (richiesta del ${data(dati.creatoIl)}): la finestra si aggiorna da sola. `}
+        {dati?.stato === 'concluso' && `Proposte del ${data(dati.conclusoIl)}. Sono già spuntate quelle di cui l'AI è sicura. `}
+        {dati?.stato === 'fallito' && `L'ultima richiesta non è andata: ${dati.errore ?? 'errore di OpenAI'}. `}
+        Chi può mangiare una ricetta lo decidono sempre i suoi ingredienti.
       </p>
-      <Stato caricamento={!dati && !errore} errore={errore} vuoto={dati?.proposte.length === 0}>
+      <div className="riga">
+        <button className="bottone secondario" disabled={inCorso || aperto} onClick={chiedi}>
+          <Sparkles size={16} aria-hidden /> {dati ? 'Chiedi nuove proposte' : 'Chiedi le proposte all\'AI'}
+        </button>
+      </div>
+      <Stato caricamento={dati === undefined && !errore} errore={errore} vuoto={!dati || dati.proposte.length === 0}>
         <div className="elenco">
-          {dati?.proposte.map((p) => (
+          {dati && dati.proposte.map((p) => (
             <label key={p.ricettaId} className="scheda cliccabile">
               <input type="checkbox" checked={scelte.has(p.ricettaId)} onChange={() => alterna(p.ricettaId)} />
               <div className="principale">

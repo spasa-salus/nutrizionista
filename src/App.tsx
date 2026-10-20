@@ -40,8 +40,10 @@ function useTema() {
   }] as const
 }
 
+// Il logotipo della tavola del brand (public/logo.svg, da ios/Scripts/genera-logo.py): un
+// disegno con i suoi colori, uguali in tema chiaro e scuro.
 function Logotipo() {
-  return <span className="logotipo" aria-label="NutriQuore"><span className="nutri">Nutri</span><span className="quore">Quore</span></span>
+  return <img className="logotipo" src="/logo.svg" alt="NutriQuore" />
 }
 
 // ---------- Accesso: la prima volta si sceglie la password ----------
@@ -70,7 +72,6 @@ function Accesso({ impostata, onEntrato }: { impostata: boolean; onEntrato: () =
   return (
     <main className="accesso">
       <div className="carta-accesso">
-        <img src="/icona.png" alt="" />
         <Logotipo />
         <div className="motto">Pannello nutrizionista</div>
         <p className="tenue">
@@ -130,7 +131,6 @@ function Pannello() {
     <div className="guscio">
       <header className="testata">
         <a className="marchio" href="#">
-          <img src="/icona.png" alt="" />
           <Logotipo />
           <span className="ruolo">Nutrizionista</span>
         </a>

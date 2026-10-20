@@ -12,7 +12,6 @@
   --sabbia: #83643f;
   --pomodoro: #a82a3a;
   --filetto: #d9c3a8;
-  --marchio-salvia: #768365;
   --marchio-terracotta: #c76a58;
   --bordo-campo: #8f8474;
   --su-pieno: var(--sfondo);
@@ -37,7 +36,6 @@
   --sabbia: #d6b793;
   --pomodoro: #ef6f86;
   --filetto: #433d33;
-  --marchio-salvia: #a4b58e;
   --marchio-terracotta: #e48f7b;
   --bordo-campo: #80776a;
   --ombra: 0 18px 50px rgba(0, 0, 0, 0.5);
@@ -73,11 +71,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--filetto);
 }
 
-.marchio { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-.marchio img { width: 36px; height: 36px; border-radius: 22.37%; }
-.logotipo { font-weight: 800; font-size: 24px; letter-spacing: -0.01em; white-space: nowrap; }
-.logotipo .nutri { color: var(--marchio-salvia); }
-.logotipo .quore { color: var(--marchio-terracotta); }
+/* min-height: la testata resta alta 61px, su cui conta .laterale. */
+.marchio { display: flex; align-items: center; gap: 10px; min-height: 36px; text-decoration: none; }
+.logotipo { display: block; height: 32px; width: auto; }
 .marchio .ruolo {
   font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
   color: var(--inchiostro-tenue); padding-top: 4px;
@@ -343,8 +339,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   width: min(420px, 100%); display: grid; gap: 16px; justify-items: center;
   padding: 32px 28px; border-radius: var(--smusso-grande); background: var(--superficie);
 }
-.carta-accesso img { width: 72px; height: 72px; border-radius: 22.37%; }
-.carta-accesso .logotipo { font-size: 34px; }
+.carta-accesso .logotipo { height: 44px; max-width: 100%; object-fit: contain; }
 .carta-accesso .motto { font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--inchiostro-tenue); text-align: center; }
 .carta-accesso form { width: 100%; display: grid; gap: 14px; }
 .carta-accesso p { margin: 0; text-align: center; }

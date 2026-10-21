@@ -3,7 +3,10 @@ import {
   Carrot, Check, ChevronRight, Croissant, CupSoda, Droplet, Drumstick, LayoutGrid, type LucideIcon, Milk, MilkOff,
   Package, Salad, Snowflake, Vegan, Wheat, WheatOff,
 } from 'lucide-react'
-import { CATEGORIE, cerca, ESIGENZE, idDaNome, perNome, type Prodotto, TAG, UNITA } from '../dominio'
+import {
+  aVolume, CATEGORIE, cerca, erroreValori, ESIGENZE, idDaNome, kcalDaiMacro, perNome, type Prodotto, TAG, UNITA, VALORI_NUTRIZIONALI,
+  type ValoriNutrizionali,
+} from '../dominio'
 import { BottoneNuovo, Campo, Cerca, Foglio, Intestazione, PiedeModifica, Reparto, Stato, Tendina, useBozza, useContenuto } from '../ui'
 
 // Rilevanza e supermercati non si mostrano piu': restano nel dato col valore che hanno (l'app
@@ -56,10 +59,12 @@ export default function Prodotti() {
   for (const r of contenuto?.ricette ?? []) {
     for (const id of new Set(r.ingredienti.map((i) => i.prodottoID))) if (id) usi.set(id, (usi.get(id) ?? 0) + 1)
   }
+  const conValori = contenuto?.prodotti.filter((p) => p.valoriNutrizionali).length ?? 0
 
   return (
     <>
-      <Intestazione titolo="Prodotti" sottotitolo={`${contenuto?.prodotti.length ?? 0} prodotti nel catalogo, divisi per reparto`}
+      <Intestazione titolo="Prodotti"
+        sottotitolo={`${contenuto?.prodotti.length ?? 0} prodotti nel catalogo, divisi per reparto · ${conValori} con i valori nutrizionali`}
         azione={<BottoneNuovo testo="Nuovo prodotto" onClick={prodotto.nuovo} />} />
       <div className="barra">
         <Cerca valore={filtro} onCambia={impostaFiltro} segnaposto="Cerca un prodotto" />
@@ -82,6 +87,9 @@ export default function Prodotti() {
                       <div className="riga">
                         <span className="etichetta salvia">{quanto(p)} a persona al giorno</span>
                         {p.tag.filter((t) => ESIGENZE.includes(t)).map((t) => <span key={t} className="etichetta sabbia">{TAG[t]}</span>)}
+                        {p.valoriNutrizionali?.energia !== undefined && (
+                          <span className="etichetta">{p.valoriNutrizionali.energia.toLocaleString('it-IT')} kcal per 100 {aVolume(p) ? 'ml' : 'g'}</span>
+                        )}
                         {(usi.get(p.id) ?? 0) > 0 && (
                           <span className="etichetta">in {usi.get(p.id)} {usi.get(p.id) === 1 ? 'ricetta' : 'ricette'}</span>
                         )}
@@ -111,11 +119,13 @@ export function FoglioProdotto({ valore, nuovo, cambia, chiudi, inCorso, onSalva
   // L'id non si vede: nasce dal nome e dopo la creazione non cambia piu' (lo citano ricette e liste).
   const presi = contenuto?.prodotti.map((p) => p.id) ?? []
   const ricette = contenuto?.ricette.filter((r) => r.ingredienti.some((i) => i.prodottoID === valore.id)).length ?? 0
-  const pronto = valore.nome.trim() !== '' && valore.quantitaBase > 0
+  const manca = !valore.nome.trim() ? 'Manca il nome'
+    : !(valore.quantitaBase > 0) ? 'Controlla la quantità'
+    : erroreValori(valore.valoriNutrizionali)
 
   return (
     <Foglio titolo={nuovo ? 'Nuovo prodotto' : 'Modifica prodotto'} onChiudi={chiudi}
-      piede={<PiedeModifica inCorso={inCorso} disabilitato={!pronto} onSalva={onSalva} onElimina={onElimina} />}>
+      piede={<PiedeModifica inCorso={inCorso} disabilitato={manca !== null} manca={manca} onSalva={onSalva} onElimina={onElimina} />}>
       <div className="testa-nome">
         <span className="cerchio-icona fisso" aria-hidden><Icona size={28} /></span>
         <Campo etichetta="Nome">
@@ -139,6 +149,8 @@ export function FoglioProdotto({ valore, nuovo, cambia, chiudi, inCorso, onSalva
         <small>Quanto ne usa di solito una persona in un giorno.</small>
       </div>
       <Esigenze valori={valore.tag} onCambia={(tag) => cambia({ tag })} />
+      <Valori valori={valore.valoriNutrizionali} perCento={aVolume(valore) ? '100 ml' : '100 g'}
+        onCambia={(valoriNutrizionali) => cambia({ valoriNutrizionali })} />
       {!nuovo && ricette > 0 && (
         <p className="tenue piccolo" style={{ margin: 0 }}>
           Usato in {ricette} {ricette === 1 ? 'ricetta' : 'ricette'}. Eliminandolo, nelle ricette resta come ingrediente scritto a mano.
@@ -172,6 +184,56 @@ function Esigenze({ valori, onCambia }: { valori: string[]; onCambia: (v: string
         })}
       </div>
       <small>Spunta solo quelle che il prodotto rispetta davvero: decidono a chi si propongono le ricette che lo usano.</small>
+    </div>
+  )
+}
+
+/**
+ * La dichiarazione nutrizionale, come sull'etichetta del prodotto. Vuoto = non si sa: si scrivono
+ * quelli che si hanno. L'energia si confronta coi macronutrienti, senza bloccare il salvataggio.
+ */
+function Valori({ valori, perCento, onCambia }: {
+  valori?: ValoriNutrizionali; perCento: string; onCambia: (v: ValoriNutrizionali | undefined) => void
+}) {
+  const imposta = (id: keyof ValoriNutrizionali, x: number) => {
+    const nuovi: ValoriNutrizionali = { ...valori, [id]: Number.isFinite(x) ? x : undefined }
+    for (const k of Object.keys(nuovi) as (keyof ValoriNutrizionali)[]) if (nuovi[k] === undefined) delete nuovi[k]
+    onCambia(Object.keys(nuovi).length ? nuovi : undefined)
+  }
+  const energia = valori?.energia
+  const stima = kcalDaiMacro(valori)
+  const lontana = stima !== null && energia !== undefined && Math.abs(energia - stima) > Math.max(20, stima * 0.15)
+  const sbagliato = (id: keyof ValoriNutrizionali) => {
+    const x = valori?.[id]
+    if (x === undefined) return false
+    if (x < 0 || x > (id === 'energia' ? 900 : 100)) return true
+    return (id === 'grassiSaturi' && x > (valori?.grassi ?? Infinity)) || (id === 'zuccheri' && x > (valori?.carboidrati ?? Infinity))
+  }
+
+  return (
+    <div className="campo">
+      <span id="valori-prodotto">Valori nutrizionali <span className="tenue">per {perCento}</span></span>
+      <div className="valori-nutrizionali" role="group" aria-labelledby="valori-prodotto">
+        {VALORI_NUTRIZIONALI.map(({ id, nome, etichetta }) => (
+          <label key={id} className={`valore${etichetta ? ' di-cui' : ''}`}>
+            <span className="nome">{etichetta ?? nome}</span>
+            {id === 'energia' && energia !== undefined && (
+              <span className="tenue piccolo">{Math.round(energia * 4.184).toLocaleString('it-IT')} kJ</span>
+            )}
+            <input type="number" min="0" max={id === 'energia' ? 900 : 100} step="any" inputMode="decimal"
+              aria-invalid={sbagliato(id)} value={valori?.[id] ?? ''} onChange={(e) => imposta(id, e.target.valueAsNumber)} />
+            <span className="unita" aria-hidden>{id === 'energia' ? 'kcal' : 'g'}</span>
+          </label>
+        ))}
+      </div>
+      {energia === undefined && stima !== null && (
+        <div className="proposta">
+          <span>Dai macronutrienti: circa <strong>{stima.toLocaleString('it-IT')} kcal</strong></span>
+          <button type="button" className="bottone secondario compatto" onClick={() => imposta('energia', stima)}>Usa questo valore</button>
+        </div>
+      )}
+      {lontana && stima !== null && <small className="nota-avviso">Dai macronutrienti verrebbero circa {stima.toLocaleString('it-IT')} kcal: controlla l’etichetta.</small>}
+      <small>Copiali dall’etichetta, per {perCento}. Lascia vuoto quello che non sai.</small>
     </div>
   )
 }

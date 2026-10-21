@@ -4,7 +4,10 @@ import {
   Package, Pencil, Plus, Search, Sparkles, Sun, Users, X,
 } from 'lucide-react'
 import { chiama } from '../api'
-import { CATEGORIE, cerca, type Contenuto, data, ELETTRODOMESTICI, elettrodomesticiDaiPassaggi, ESIGENZE, esigenzeDellaRicetta, idDaNome, type Ingrediente, perNome, type Prodotto, type Ricetta, TAG } from '../dominio'
+import {
+  aVolume, CATEGORIE, cerca, type Contenuto, data, ELETTRODOMESTICI, elettrodomesticiDaiPassaggi, ESIGENZE, esigenzeDellaRicetta, idDaNome,
+  type Ingrediente, MISURE_CASALINGHE, type MisuraCasalinga, perNome, type Prodotto, type Ricetta, TAG,
+} from '../dominio'
 import {
   BottoneNuovo, Campo, Cerca, Contatore, Foglio, Intestazione, PiedeModifica, Reparto, SceltaMultipla, Stato, Tendina,
   useBozza, useComparsa, useContenuto, useElenco, useNotifica,
@@ -25,15 +28,71 @@ export const PASTI: { momento: string; nome: string; tante: string; icona: Lucid
 ]
 const iconaPasto = (momento: string) => PASTI.find((p) => p.momento === momento)?.icona ?? Sun
 
-// Nelle ricette le unita' brevi, grammi per primi: e' l'unita' di quasi ogni ingrediente.
-const UNITA_INGREDIENTE: [string, string][] = [
+// Nelle ricette prima le misure di casa, poi peso e pezzi per quello che a cucchiai non si misura
+// (pasta, carne); le unita' brevi, grammi per primi.
+const PESO_E_PEZZI: [string, string][] = [
   ['grammo', 'g'], ['chilogrammo', 'kg'], ['millilitro', 'ml'], ['litro', 'l'], ['pezzo', 'pezzi'], ['confezione', 'confezioni'],
 ]
+const gruppiUnita = (dose: number): [string, [string, string][]][] => [
+  ['Misure di casa', MISURE_CASALINGHE.map((m) => [m.id, dose > 1 ? m.tante : m.una])],
+  ['Peso, volume e pezzi', PESO_E_PEZZI],
+]
+const misura = (id: string) => MISURE_CASALINGHE.find((m) => m.id === id)
+const arrotonda = (n: number) => Math.round(n * 10) / 10
+// Kg e litri in grammi e millilitri, per passare da una misura all'altra.
+const IN_PICCOLO: Record<string, [string, number]> = {
+  grammo: ['grammo', 1], chilogrammo: ['grammo', 1000], millilitro: ['millilitro', 1], litro: ['millilitro', 1000],
+}
 // Un prodotto a chili o a litri entra in ricetta a grammi o millilitri: nessuno scrive 0,32 kg di spaghetti.
 const INGREDIENTE_DA: Record<string, Pick<Ingrediente, 'quantita' | 'unita'>> = {
   grammo: { quantita: 100, unita: 'grammo' }, chilogrammo: { quantita: 100, unita: 'grammo' },
   millilitro: { quantita: 100, unita: 'millilitro' }, litro: { quantita: 100, unita: 'millilitro' },
   pezzo: { quantita: 1, unita: 'pezzo' }, confezione: { quantita: 1, unita: 'confezione' },
+}
+
+/** Quanto pesa una dose di casa secondo le porzioni standard: in ml per un prodotto a volume o una misura da liquidi. */
+function stima(m: MisuraCasalinga, prodotto?: Prodotto): Pick<Ingrediente, 'quantita' | 'unita'> {
+  const liquido = aVolume(prodotto) || !!misura(m.unita)?.liquida
+  return { quantita: arrotonda(m.quantita * (misura(m.unita)?.vale ?? 1)), unita: liquido ? 'millilitro' : 'grammo' }
+}
+
+/** Un ingrediente nuovo dal catalogo: olio, sale e gli altri condimenti a cucchiai, il resto a peso o a pezzi. */
+function ingredienteDa(p: Prodotto): Ingrediente {
+  if (p.categoria !== 'condimenti') return { prodottoID: p.id, nome: p.nome, ...INGREDIENTE_DA[p.unita] ?? { quantita: 1, unita: p.unita } }
+  const misuraCasalinga = { quantita: 1, unita: 'cucchiaio' }
+  return { prodottoID: p.id, nome: p.nome, ...stima(misuraCasalinga, p), misuraCasalinga }
+}
+
+/** Un'altra dose. Con la misura di casa il peso segue in proporzione: un equivalente corretto a mano resta giusto. */
+function conDose(r: Ingrediente, dose: number): Ingrediente {
+  const m = r.misuraCasalinga
+  if (!m) return { ...r, quantita: dose }
+  const perMisura = m.quantita > 0 && r.quantita > 0 ? r.quantita / m.quantita : misura(m.unita)?.vale ?? 1
+  return { ...r, misuraCasalinga: { ...m, quantita: dose }, quantita: Number.isFinite(dose) ? arrotonda(dose * perMisura) : r.quantita }
+}
+
+/**
+ * Un'altra unita'. Fra misure di casa, grammi e millilitri la dose si converte e il peso resta quello
+ * che era: 30 ml di olio diventano 3 cucchiai, sempre 30 ml. Da pezzi e confezioni si parte da una
+ * misura col suo peso standard; fra peso e pezzi cambia solo l'unita', come sempre.
+ */
+function conUnita(r: Ingrediente, unita: string, prodotto?: Prodotto): Ingrediente {
+  const nuova = misura(unita)
+  const { misuraCasalinga: vecchia, ...riga } = r
+  if (!nuova) {
+    if (!vecchia) return { ...riga, unita }
+    const fattore = IN_PICCOLO[unita]?.[1]
+    return { ...riga, quantita: fattore ? r.quantita / fattore : vecchia.quantita, unita }
+  }
+  const peso = vecchia ? { quantita: r.quantita, unita: r.unita }
+    : IN_PICCOLO[r.unita] && { quantita: r.quantita * IN_PICCOLO[r.unita][1], unita: IN_PICCOLO[r.unita][0] }
+  if (!peso || !(peso.quantita > 0)) {
+    const misuraCasalinga = { quantita: 1, unita }
+    return { ...riga, ...stima(misuraCasalinga, prodotto), misuraCasalinga }
+  }
+  // A mezze misure: 3 g di pepe sono 6 pizzichi, e mai meno di mezza.
+  const quante = Math.max(0.5, Math.round((peso.quantita / nuova.vale) * 2) / 2)
+  return { ...riga, ...peso, misuraCasalinga: { quantita: quante, unita } }
 }
 
 // I piatti della community (funzione admin, piatti.elenco): le foto di una ricetta sono le loro.
@@ -174,7 +233,8 @@ export function cosaManca(r: Ricetta): string | null {
   if (!r.nome.trim()) return 'Manca il nome'
   if (!intero(r.minutiPreparazione, 0, 1440)) return 'Controlla il tempo'
   if (!intero(r.porzioni, 1, 50)) return 'Controlla le porzioni'
-  if (!r.ingredienti.every((i) => (!i.nome.trim() && !i.prodottoID) || i.quantita > 0)) return 'Un ingrediente senza quantità'
+  const dosato = (i: Ingrediente) => i.quantita > 0 && (!i.misuraCasalinga || i.misuraCasalinga.quantita > 0)
+  if (!r.ingredienti.every((i) => (!i.nome.trim() && !i.prodottoID) || dosato(i))) return 'Un ingrediente senza quantità'
   if (!r.elettrodomestici) return 'Indica gli elettrodomestici'
   return null
 }
@@ -411,16 +471,23 @@ function Ingredienti({ righe, onCambia, onModificaProdotto }: {
     campo?.select()
     daSelezionare.current = null
   })
-  const aggiorna = (i: number, modifica: Partial<Ingrediente>) => onCambia(righe.map((r, n) => n === i ? { ...r, ...modifica } : r))
+  const sostituisci = (i: number, riga: Ingrediente) => onCambia(righe.map((r, n) => n === i ? riga : r))
+  const aggiorna = (i: number, modifica: Partial<Ingrediente>) => sostituisci(i, { ...righe[i], ...modifica })
   const aggiungi = (riga: Ingrediente) => { daSelezionare.current = righe.length; onCambia([...righe, riga]) }
 
   return (
     <div className="campo">
       <Reparto>Ingredienti · {righe.length}</Reparto>
-      <small>Collega ogni ingrediente a un prodotto del catalogo: così finisce nella lista della spesa e conta per le esigenze.</small>
+      <small>
+        Collega ogni ingrediente a un prodotto del catalogo: così finisce nella lista della spesa e conta per le esigenze.
+        Le dosi si scrivono come in cucina (cucchiai, tazzine…); accanto, quanto pesano: è quello che va in lista.
+        Correggilo se l’ingrediente pesa diverso (un cucchiaio di zucchero sono circa 12 g).
+      </small>
       <div className="righe" ref={elenco}>
         {righe.map((r, i) => {
           const prodotto = r.prodottoID ? perId.get(r.prodottoID) : undefined
+          const m = r.misuraCasalinga
+          const dose = m ? m.quantita : r.quantita
           return (
             <div key={i} className="ingrediente-riga">
               <div className="principale">
@@ -442,11 +509,24 @@ function Ingredienti({ righe, onCambia, onModificaProdotto }: {
                   )}
                 </div>
               </div>
-              <div className="quantita-unita piccola" role="group" aria-label={`Quantità dell'ingrediente ${i + 1}`}>
-                <input className="numero" type="number" min="0" step="any" inputMode="decimal" aria-label="Quantità"
-                  aria-invalid={!(r.quantita > 0)} value={Number.isFinite(r.quantita) ? r.quantita : ''}
-                  onChange={(e) => aggiorna(i, { quantita: e.target.valueAsNumber })} />
-                <Tendina etichetta="Unità" classe="unita" valore={r.unita} opzioni={UNITA_INGREDIENTE} onCambia={(unita) => aggiorna(i, { unita })} />
+              <div className="dose">
+                <div className="quantita-unita piccola" role="group" aria-label={`Quantità dell'ingrediente ${i + 1}`}>
+                  <input className="numero" type="number" min="0" step="any" inputMode="decimal" aria-label="Quantità"
+                    aria-invalid={!(dose > 0)} value={Number.isFinite(dose) ? dose : ''}
+                    onChange={(e) => sostituisci(i, conDose(r, e.target.valueAsNumber))} />
+                  <Tendina etichetta="Unità" classe="unita" valore={m ? m.unita : r.unita} gruppi={gruppiUnita(dose)}
+                    onCambia={(unita) => sostituisci(i, conUnita(r, unita, prodotto))} />
+                </div>
+                {m && (
+                  <div className="equivalente" role="group" aria-label={`Quanto pesa l'ingrediente ${i + 1}`}>
+                    <span aria-hidden>circa</span>
+                    <input type="number" min="0" step="any" inputMode="decimal" aria-label="Peso o volume"
+                      aria-invalid={!(r.quantita > 0)} value={Number.isFinite(r.quantita) ? r.quantita : ''}
+                      onChange={(e) => aggiorna(i, { quantita: e.target.valueAsNumber })} />
+                    <Tendina etichetta="Grammi o millilitri" valore={r.unita} opzioni={[['grammo', 'g'], ['millilitro', 'ml']]}
+                      onCambia={(unita) => aggiorna(i, { unita })} />
+                  </div>
+                )}
               </div>
               <button type="button" className="tondo piccolo pericolo" aria-label={`Togli ${r.nome || `l'ingrediente ${i + 1}`}`}
                 onClick={() => onCambia(righe.filter((_, n) => n !== i))}><X size={16} /></button>
@@ -457,7 +537,7 @@ function Ingredienti({ righe, onCambia, onModificaProdotto }: {
       </div>
       <div>
         <ScegliProdotto etichetta="Aggiungi un ingrediente" classe="bottone secondario compatto"
-          onScegli={(p) => aggiungi({ prodottoID: p.id, nome: p.nome, ...INGREDIENTE_DA[p.unita] ?? { quantita: 1, unita: p.unita } })}
+          onScegli={(p) => aggiungi(ingredienteDa(p))}
           onTesto={(nome) => aggiungi({ nome, quantita: 100, unita: 'grammo' })}>
           <Plus size={16} aria-hidden /> Aggiungi ingrediente
         </ScegliProdotto>

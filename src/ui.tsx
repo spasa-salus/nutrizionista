@@ -167,8 +167,9 @@ export function Pastiglie({ opzioni, valori, onCambia, etichetta }: {
  * a sinistra. Sotto c'e' un select vero, cosi' tastiera, lettori di schermo e telefoni lo aprono
  * con il loro selettore.
  */
-export function Tendina({ valore, opzioni, onCambia, etichetta, icona: Icona, classe }: {
-  valore: string; opzioni: [string, string][]; onCambia: (v: string) => void; etichetta: string
+/** `gruppi` dopo le `opzioni`: ognuno col suo titolo nel menu. */
+export function Tendina({ valore, opzioni = [], gruppi = [], onCambia, etichetta, icona: Icona, classe }: {
+  valore: string; opzioni?: [string, string][]; gruppi?: [string, [string, string][]][]; onCambia: (v: string) => void; etichetta: string
   icona?: LucideIcon; classe?: string
 }) {
   return (
@@ -176,6 +177,11 @@ export function Tendina({ valore, opzioni, onCambia, etichetta, icona: Icona, cl
       {Icona && <Icona size={20} className="icona-tendina" aria-hidden />}
       <select value={valore} aria-label={etichetta} onChange={(e) => onCambia(e.target.value)}>
         {opzioni.map(([v, nome]) => <option key={v} value={v}>{nome}</option>)}
+        {gruppi.map(([titolo, voci]) => (
+          <optgroup key={titolo} label={titolo}>
+            {voci.map(([v, nome]) => <option key={v} value={v}>{nome}</option>)}
+          </optgroup>
+        ))}
       </select>
       <span className="freccia" aria-hidden><ChevronDown size={18} strokeWidth={2.5} /></span>
     </span>

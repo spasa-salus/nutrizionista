@@ -1,29 +1,37 @@
 import { type FormEvent, useEffect, useState } from 'react'
-import { BookOpen, Link2, LogOut, MessageCircleQuestion, Moon, Package, Camera, ShoppingBasket, Store, Sun } from 'lucide-react'
+import { Columns3, BookOpen, Link2, LogOut, Mail, MessageCircleQuestion, Moon, Package, Camera, ShoppingBasket, Sun } from 'lucide-react'
 import { chiama, salvaSessione, sessione } from './api'
 import { FornitoreContenuto, useNotifica } from './ui'
+import { AutorizzaMcp, BottoneMcp, richiestaMcp } from './mcp'
 import Carrelli from './sezioni/Carrelli'
+import Editor from './sezioni/Editor'
 import Prodotti from './sezioni/Prodotti'
 import Ricette from './sezioni/Ricette'
-import Supermercati from './sezioni/Supermercati'
 import Associazioni from './sezioni/Associazioni'
 import Piatti from './sezioni/Piatti'
 import Domande from './sezioni/Domande'
+import Messaggi, { type Messaggio } from './sezioni/Messaggi'
 
 const SEZIONI = [
   { reparto: 'Contenuto', voci: [
     { id: 'carrelli', nome: 'Carrelli', icona: ShoppingBasket, vista: Carrelli },
     { id: 'prodotti', nome: 'Prodotti', icona: Package, vista: Prodotti },
     { id: 'ricette', nome: 'Ricette', icona: BookOpen, vista: Ricette },
-    { id: 'supermercati', nome: 'Supermercati', icona: Store, vista: Supermercati },
-    { id: 'associazioni', nome: 'Associazioni', icona: Link2, vista: Associazioni },
   ] },
   { reparto: 'Community', voci: [
     { id: 'piatti', nome: 'Post community', icona: Camera, vista: Piatti },
     { id: 'domande', nome: 'Domande Q&A', icona: MessageCircleQuestion, vista: Domande },
   ] },
+  { reparto: 'B2B', voci: [
+    { id: 'associazioni', nome: 'Associazioni', icona: Link2, vista: Associazioni },
+  ] },
+  { reparto: 'Sito', voci: [
+    { id: 'messaggi', nome: 'Messaggi', icona: Mail, vista: Messaggi },
+  ] },
 ]
-const VOCI = SEZIONI.flatMap((s) => s.voci)
+// L'editor a colonne sta a parte: in cima al menu, staccato dalle sezioni, e prende tutta la larghezza.
+const EDITOR = { id: 'editor', nome: 'Editor', icona: Columns3, vista: Editor }
+const VOCI = [...SEZIONI.flatMap((s) => s.voci), EDITOR]
 
 // ---------- Tema chiaro/scuro: di base segue il sistema, la scelta a mano resta ----------
 
@@ -48,7 +56,7 @@ function Logotipo() {
 
 // ---------- Accesso: la prima volta si sceglie la password ----------
 
-function Accesso({ impostata, onEntrato }: { impostata: boolean; onEntrato: () => void }) {
+function Accesso({ impostata, onEntrato, nota }: { impostata: boolean; onEntrato: () => void; nota?: string }) {
   const [password, impostaPassword] = useState('')
   const [ripeti, impostaRipeti] = useState('')
   const [errore, impostaErrore] = useState<string | null>(null)
@@ -75,7 +83,7 @@ function Accesso({ impostata, onEntrato }: { impostata: boolean; onEntrato: () =
         <Logotipo />
         <div className="motto">Pannello nutrizionista</div>
         <p className="tenue">
-          {impostata ? 'Inserisci la password per entrare.' : 'Primo accesso: scegli la password del pannello. Almeno 12 caratteri.'}
+          {nota ?? (impostata ? 'Inserisci la password per entrare.' : 'Primo accesso: scegli la password del pannello. Almeno 12 caratteri.')}
         </p>
         <form onSubmit={invia}>
           <label className="campo">
@@ -113,8 +121,19 @@ function usaSezione() {
   return voce
 }
 
+// Quanti messaggi dal sito sono da leggere: si riconta a ogni cambio di sezione.
+function useDaGuardare(voce: string) {
+  const [numeri, imposta] = useState<Record<string, number>>({})
+  useEffect(() => {
+    chiama<Messaggio[]>('contatti.elenco')
+      .then((r) => imposta((n) => ({ ...n, messaggi: r.filter((m) => !m.letto_il).length })), () => {})
+  }, [voce])
+  return numeri
+}
+
 function Pannello() {
   const voce = usaSezione()
+  const daGuardare = useDaGuardare(voce.id)
   const [tema, cambiaTema] = useTema()
   const notifica = useNotifica()
   const Vista = voce.vista
@@ -135,14 +154,19 @@ function Pannello() {
           <span className="ruolo">Nutrizionista</span>
         </a>
         <div className="azioni-testata">
+          <BottoneMcp />
           <button className="tondo" onClick={cambiaTema} aria-label={tema === 'scuro' ? 'Tema chiaro' : 'Tema scuro'} title={tema === 'scuro' ? 'Tema chiaro' : 'Tema scuro'}>
             {tema === 'scuro' ? <Sun size={20} /> : <Moon size={20} />}
           </button>
-          <button className="bottone secondario compatto" onClick={esci}><LogOut size={16} />Esci</button>
+          <button className="bottone secondario compatto" onClick={esci} aria-label="Esci"><LogOut size={16} aria-hidden /><span className="testo-largo">Esci</span></button>
         </div>
       </header>
       <div className="corpo">
         <nav className="laterale" aria-label="Sezioni">
+          <a href={`#${EDITOR.id}`} className="ingresso-editor" aria-current={voce.id === EDITOR.id ? 'page' : undefined}>
+            <EDITOR.icona size={22} aria-hidden />
+            <span><strong>Editor</strong><small>carrelli, ricette e prodotti insieme</small></span>
+          </a>
           {SEZIONI.map((s) => (
             <div key={s.reparto} style={{ display: 'contents' }}>
               <div className="reparto">{s.reparto}</div>
@@ -150,12 +174,15 @@ function Pannello() {
                 <a key={v.id} href={`#${v.id}`} className="voce-laterale" aria-current={v.id === voce.id ? 'page' : undefined}
                   style={{ textDecoration: 'none' }}>
                   <v.icona size={20} aria-hidden />{v.nome}
+                  {(daGuardare[v.id] ?? 0) > 0 && (
+                    <span className="conteggio" aria-label={`${daGuardare[v.id]} da guardare`}>{daGuardare[v.id]}</span>
+                  )}
                 </a>
               ))}
             </div>
           ))}
         </nav>
-        <main className="pagina">
+        <main className={`pagina${voce.id === EDITOR.id ? ' larga' : ''}`}>
           <FornitoreContenuto>
             <Vista />
           </FornitoreContenuto>
@@ -169,6 +196,8 @@ export default function App() {
   const [connesso, impostaConnesso] = useState(() => !!sessione())
   const [impostata, impostaImpostata] = useState<boolean | null>(null)
   const [errore, impostaErrore] = useState<string | null>(null)
+  // Un client MCP che chiede di collegarsi: prima si entra, poi si danno i permessi.
+  const [richiesta, impostaRichiesta] = useState(richiestaMcp)
 
   useEffect(() => {
     const aggiorna = () => impostaConnesso(!!sessione())
@@ -180,8 +209,10 @@ export default function App() {
     if (!connesso) chiama<{ impostata: boolean }>('stato').then((s) => impostaImpostata(s.impostata), (e) => impostaErrore(e.message))
   }, [connesso])
 
+  if (connesso && richiesta) return <AutorizzaMcp richiesta={richiesta} pannello="Pannello nutrizionista" onChiudi={() => impostaRichiesta(null)} />
   if (connesso) return <Pannello />
   if (errore) return <main className="accesso"><div className="avviso errore">{errore}</div></main>
   if (impostata === null) return <div className="caricamento">Carico…</div>
-  return <Accesso impostata={impostata} onEntrato={() => impostaConnesso(true)} />
+  return <Accesso impostata={impostata} onEntrato={() => impostaConnesso(true)}
+    nota={richiesta ? 'Entra per scegliere cosa può fare l’assistente AI che chiede di collegarsi.' : undefined} />
 }

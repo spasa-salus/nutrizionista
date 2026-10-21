@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Flag, Heart, ImageUp, ShieldAlert } from 'lucide-react'
 import { chiama } from '../api'
 import { cerca, data, perNome } from '../dominio'
-import { BottoneElimina, Campo, BottoneNuovo, Cerca, Foglio, Intestazione, PiedeModifica, Stato, useBozza, useContenuto, useElenco, useNotifica } from '../ui'
+import { BottoneElimina, Campo, BottoneNuovo, Cerca, Foglio, Intestazione, PiedeModifica, Stato, Tendina, useBozza, useContenuto, useElenco, useNotifica } from '../ui'
 
 // Solo gli account di redazione (utenti.autori): i post degli utenti veri non si scrivono a nome loro.
 type Utente = { id: string; email: string; nome_utente: string | null }
@@ -29,7 +29,7 @@ const SOGLIA_NASCOSTO = 3
 const nascosto = (p: Piatto) => p.segnalazioni >= SOGLIA_NASCOSTO || p.moderazione !== 'ok'
 
 /** Riduce la foto a JPEG sotto i 2 MB del bucket, lato lungo al massimo 1600 px. */
-async function jpeg(file: File): Promise<{ base64: string; anteprima: string }> {
+export async function jpeg(file: File): Promise<{ base64: string; anteprima: string }> {
   const immagine = await createImageBitmap(file)
   const scala = Math.min(1, 1600 / Math.max(immagine.width, immagine.height))
   const tela = document.createElement('canvas')
@@ -177,5 +177,64 @@ export default function Piatti() {
         </Foglio>
       )}
     </>
+  )
+}
+
+/**
+ * Una foto nuova per una ricetta, dall'Editor e dalla scheda della ricetta: e' un post della
+ * community a nome di un account di redazione, come «Nuovo post» qui sopra.
+ */
+export function FoglioNuovaFoto({ ricettaId, ricettaNome, onChiudi, onPubblicata }: {
+  ricettaId: string; ricettaNome: string; onChiudi: () => void; onPubblicata: () => void
+}) {
+  const autori = (useElenco<Utente>('utenti.autori').righe ?? []).filter((u) => u.nome_utente)
+  const notifica = useNotifica()
+  const [utenteId, impostaUtente] = useState('')
+  const [didascalia, impostaDidascalia] = useState('')
+  const [foto, impostaFoto] = useState<{ base64: string; anteprima: string } | null>(null)
+  const [inCorso, impostaInCorso] = useState(false)
+  const autore = utenteId || autori[0]?.id || ''
+
+  async function scegli(file: File | undefined) {
+    if (!file) return
+    try { impostaFoto(await jpeg(file)) } catch (e) { notifica((e as Error).message, true) }
+  }
+  async function pubblica() {
+    if (!foto) return
+    impostaInCorso(true)
+    try {
+      await chiama('piatti.salva', { utenteId: autore, ricettaId, didascalia, foto: foto.base64 })
+      notifica('Foto pubblicata: la vede chi apre la ricetta dopo la moderazione')
+      onPubblicata()
+      onChiudi()
+    } catch (e) {
+      notifica((e as Error).message, true)
+    } finally {
+      impostaInCorso(false)
+    }
+  }
+
+  return (
+    <Foglio titolo={`Foto di «${ricettaNome}»`} onChiudi={onChiudi} stretto
+      piede={<><div className="spazio" />
+        <button className="bottone principale" disabled={inCorso || !foto || !autore} onClick={pubblica}>
+          {inCorso ? 'Pubblico…' : 'Pubblica la foto'}
+        </button></>}>
+      <label className={`scelta-foto${foto ? ' con-foto' : ''}`}>
+        {foto ? <img src={foto.anteprima} alt="Anteprima" /> : <><ImageUp size={32} aria-hidden /><span>Scegli una foto del piatto</span></>}
+        <input type="file" accept="image/*" hidden onChange={(e) => scegli(e.target.files?.[0])} />
+      </label>
+      {foto && <small className="tenue">Tocca la foto per cambiarla.</small>}
+      {autori.length === 0
+        ? <div className="avviso" style={{ margin: 0 }}>Per pubblicare serve un account di redazione con un nome utente: si crea dalla sezione Utenti dell’admin.</div>
+        : <Campo etichetta="Pubblicata da">
+            <Tendina etichetta="Autore" valore={autore} onCambia={impostaUtente}
+              opzioni={autori.map((u) => [u.id, `@${u.nome_utente}`])} />
+          </Campo>}
+      <Campo etichetta="Descrizione" aiuto="Facoltativa, come la scrive chi pubblica nella community">
+        <textarea className="area" maxLength={300} value={didascalia} placeholder="Es. Con il basilico dell’orto"
+          onChange={(e) => impostaDidascalia(e.target.value)} />
+      </Campo>
+    </Foglio>
   )
 }

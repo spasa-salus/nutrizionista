@@ -1,18 +1,14 @@
 // Forme e nomi del contenuto come in Entita.swift ed Enumerazioni.swift dell'app iOS.
 
 export type Supermercato = { id: string; nome: string; logo?: string; latitudine?: number; longitudine?: number }
-/** Per 100 g (100 ml se il prodotto e' a volume), come sull'etichetta: energia in kcal, il resto in grammi. */
+/** Per 100 g (100 ml per le bevande e quello che si misura a bicchieri), come sull'etichetta: energia in kcal, il resto in grammi. */
 export type ValoriNutrizionali = Partial<Record<'energia' | 'grassi' | 'grassiSaturi' | 'carboidrati' | 'zuccheri' | 'fibre' | 'proteine' | 'sale', number>>
 export type Prodotto = {
   id: string; nome: string; categoria: string; tag: string[]; supermercati: string[]
   unita: string; quantitaBase: number; rilevanza: number; valoriNutrizionali?: ValoriNutrizionali
 }
-export type MisuraCasalinga = { quantita: number; unita: string }
-/**
- * Con `misuraCasalinga` la dose si legge cosi' (2 cucchiai) e quantita/unita sono quanto pesa, in
- * grammi o millilitri: e' quello che sommano la lista della spesa e le app che la misura non la leggono.
- */
-export type Ingrediente = { prodottoID?: string; nome: string; quantita: number; unita: string; misuraCasalinga?: MisuraCasalinga }
+/** La dose come si dice in cucina: 2 cucchiai, 1 pugno, 3 pezzi. Pesi e volumi non ci sono. */
+export type Ingrediente = { prodottoID?: string; nome: string; quantita: number; unita: string }
 /** `tag` lo ricalcola il server dagli ingredienti (esigenzeDellaRicetta): qui si legge e basta. */
 export type Ricetta = {
   id: string; nome: string; descrizione: string; ingredienti: Ingrediente[]; carrelli: string[]
@@ -33,9 +29,6 @@ export const CATEGORIE: Record<string, string> = {
   cereali: 'Pasta, pane e cereali', colazione: 'Colazione', dispensa: 'Dispensa',
   surgelati: 'Surgelati', condimenti: 'Condimenti', bevande: 'Bevande',
 }
-export const UNITA: Record<string, string> = {
-  pezzo: 'pezzi', grammo: 'g', chilogrammo: 'kg', millilitro: 'ml', litro: 'l', confezione: 'confezioni',
-}
 export const TAG: Record<string, string> = {
   vegano: 'Vegano', vegetariano: 'Vegetariano', senzaGlutine: 'Senza glutine', senzaLattosio: 'Senza lattosio',
   proteico: 'Proteico', leggero: 'Leggero', adattoBambini: 'Adatto ai bambini', veloce: 'Veloce',
@@ -43,26 +36,54 @@ export const TAG: Record<string, string> = {
 export const ESIGENZE = ['vegano', 'vegetariano', 'senzaGlutine', 'senzaLattosio']
 
 /**
- * Le misure di casa, come MISURE_CASALINGHE in contenuto.ts. `vale` e' una misura in grammi o
- * millilitri secondo le porzioni standard: la proposta, che chi scrive corregge per l'ingrediente
- * (un cucchiaio di zucchero non pesa come uno di parmigiano). `liquida`: senza prodotto, in ml.
+ * Le misure di ingredienti e prodotti, come UNITA in contenuto.ts e Unita nelle app: solo quelle di
+ * casa, pezzi e confezioni compresi. `casa: false` per pezzi e confezioni, che nel menu vanno a parte.
  */
-export const MISURE_CASALINGHE: { id: string; una: string; tante: string; vale: number; liquida?: boolean }[] = [
-  { id: 'cucchiaio', una: 'cucchiaio', tante: 'cucchiai', vale: 10 },
-  { id: 'cucchiaino', una: 'cucchiaino', tante: 'cucchiaini', vale: 5 },
-  { id: 'tazzina', una: 'tazzina', tante: 'tazzine', vale: 50, liquida: true },
-  { id: 'tazza', una: 'tazza', tante: 'tazze', vale: 250, liquida: true },
-  { id: 'bicchiere', una: 'bicchiere', tante: 'bicchieri', vale: 200, liquida: true },
-  { id: 'vasetto', una: 'vasetto', tante: 'vasetti', vale: 125 },
-  { id: 'fetta', una: 'fetta', tante: 'fette', vale: 30 },
-  { id: 'spicchio', una: 'spicchio', tante: 'spicchi', vale: 5 },
-  { id: 'noce', una: 'noce', tante: 'noci', vale: 10 },
-  { id: 'manciata', una: 'manciata', tante: 'manciate', vale: 30 },
-  { id: 'ciuffo', una: 'ciuffo', tante: 'ciuffi', vale: 5 },
-  { id: 'rametto', una: 'rametto', tante: 'rametti', vale: 2 },
-  { id: 'foglia', una: 'foglia', tante: 'foglie', vale: 1 },
-  { id: 'pizzico', una: 'pizzico', tante: 'pizzichi', vale: 0.5 },
+export const MISURE: { id: string; una: string; tante: string; casa: boolean }[] = [
+  { id: 'cucchiaio', una: 'cucchiaio', tante: 'cucchiai', casa: true },
+  { id: 'cucchiaino', una: 'cucchiaino', tante: 'cucchiaini', casa: true },
+  { id: 'tazza', una: 'tazza', tante: 'tazze', casa: true },
+  { id: 'tazzina', una: 'tazzina', tante: 'tazzine', casa: true },
+  { id: 'bicchiere', una: 'bicchiere', tante: 'bicchieri', casa: true },
+  { id: 'pugno', una: 'pugno', tante: 'pugni', casa: true },
+  { id: 'manciata', una: 'manciata', tante: 'manciate', casa: true },
+  { id: 'fetta', una: 'fetta', tante: 'fette', casa: true },
+  { id: 'vasetto', una: 'vasetto', tante: 'vasetti', casa: true },
+  { id: 'noce', una: 'noce', tante: 'noci', casa: true },
+  { id: 'spicchio', una: 'spicchio', tante: 'spicchi', casa: true },
+  { id: 'ciuffo', una: 'ciuffo', tante: 'ciuffi', casa: true },
+  { id: 'rametto', una: 'rametto', tante: 'rametti', casa: true },
+  { id: 'foglia', una: 'foglia', tante: 'foglie', casa: true },
+  { id: 'pizzico', una: 'pizzico', tante: 'pizzichi', casa: true },
+  { id: 'pezzo', una: 'pezzo', tante: 'pezzi', casa: false },
+  { id: 'confezione', una: 'confezione', tante: 'confezioni', casa: false },
 ]
+
+/** Il nome della misura per quella quantita': 1 cucchiaio, ½ cucchiaio, 1½ cucchiai. */
+export function nomeMisura(unita: string, quantita: number) {
+  const m = MISURE.find((x) => x.id === unita)
+  return m ? (quantita > 1 ? m.tante : m.una) : unita
+}
+
+/** Le misure di casa per gruppi, coi nomi accordati alla quantita': per le tendine. */
+export const gruppiMisure = (quantita: number): [string, [string, string][]][] => [
+  ['Misure di casa', MISURE.filter((m) => m.casa).map((m) => [m.id, nomeMisura(m.id, quantita)])],
+  ['Pezzi e confezioni', MISURE.filter((m) => !m.casa).map((m) => [m.id, nomeMisura(m.id, quantita)])],
+]
+
+const FRAZIONI: Record<number, string> = { 25: '¼', 50: '½', 75: '¾' }
+/**
+ * Una dose da leggere, come Unita.formatta nelle app: «3 pezzi», «½ tazza», «1½ cucchiai». Al
+ * singolare l'uno e le frazioni da sole, al plurale il resto (0,3 pizzichi).
+ */
+export function dose(quantita: number, unita: string) {
+  const intero = Math.floor(quantita + 1e-9)
+  const frazione = FRAZIONI[Math.round((quantita - intero) * 100)]
+  const numero = frazione ? `${intero || ''}${frazione}` : quantita.toLocaleString('it-IT', { maximumFractionDigits: 2 })
+  const m = MISURE.find((x) => x.id === unita)
+  const nome = !m ? unita : quantita === 1 || (quantita < 1 && frazione) ? m.una : m.tante
+  return `${numero} ${nome}`
+}
 
 /** Come VALORI_NUTRIZIONALI in contenuto.ts, nell'ordine dell'etichetta; `etichetta` se e' un «di cui». */
 export const VALORI_NUTRIZIONALI: { id: keyof ValoriNutrizionali; nome: string; etichetta?: string }[] = [
@@ -101,7 +122,9 @@ export function kcalDaiMacro(v: ValoriNutrizionali | undefined): number | null {
   return Math.round(9 * v.grassi + 4 * v.carboidrati + 4 * v.proteine + 2 * (v.fibre ?? 0))
 }
 
-export const aVolume = (p?: Pick<Prodotto, 'unita'>) => p?.unita === 'millilitro' || p?.unita === 'litro'
+/** Se i valori in etichetta sono per 100 ml: le bevande e quello che si misura a bicchieri o tazzine. */
+export const aVolume = (p?: Pick<Prodotto, 'unita' | 'categoria'>) =>
+  p?.categoria === 'bevande' || p?.unita === 'bicchiere' || p?.unita === 'tazzina'
 /** Come Elettrodomestico in Cucina.swift; il file e' quello delle figure in public/cucina. */
 export const ELETTRODOMESTICI: { id: string; nome: string; file: string }[] = [
   { id: 'forno', nome: 'Forno', file: 'forno' },

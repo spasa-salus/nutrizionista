@@ -4,8 +4,8 @@ import {
   Package, Salad, Snowflake, Vegan, Wheat, WheatOff,
 } from 'lucide-react'
 import {
-  aVolume, CATEGORIE, cerca, erroreValori, ESIGENZE, idDaNome, kcalDaiMacro, perNome, type Prodotto, TAG, UNITA, VALORI_NUTRIZIONALI,
-  type ValoriNutrizionali,
+  aVolume, CATEGORIE, cerca, dose, erroreValori, ESIGENZE, gruppiMisure, idDaNome, kcalDaiMacro, perNome, type Prodotto, TAG,
+  VALORI_NUTRIZIONALI, type ValoriNutrizionali,
 } from '../dominio'
 import { BottoneNuovo, Campo, Cerca, Foglio, Intestazione, PiedeModifica, Reparto, Stato, Tendina, useBozza, useContenuto } from '../ui'
 
@@ -17,15 +17,6 @@ export const ICONE_REPARTO: Record<string, LucideIcon> = {
   fruttaVerdura: Carrot, proteine: Drumstick, latticini: Milk, cereali: Wheat, colazione: Croissant,
   dispensa: Package, surgelati: Snowflake, condimenti: Droplet, bevande: CupSoda,
 }
-
-// Nel menu le unita' per intero; nelle schede la forma breve di UNITA.
-const UNITA_PER_ESTESO: [string, string][] = [
-  ['pezzo', 'pezzi'], ['grammo', 'grammi (g)'], ['chilogrammo', 'chili (kg)'],
-  ['millilitro', 'millilitri (ml)'], ['litro', 'litri (l)'], ['confezione', 'confezioni'],
-]
-const SINGOLARE: Record<string, string> = { pezzo: 'pezzo', confezione: 'confezione' }
-const quanto = (p: Prodotto) =>
-  `${p.quantitaBase.toLocaleString('it-IT')} ${(p.quantitaBase === 1 && SINGOLARE[p.unita]) || UNITA[p.unita] || p.unita}`
 
 export const ICONE_ESIGENZA: Record<string, LucideIcon> = { vegano: Vegan, vegetariano: Salad, senzaGlutine: WheatOff, senzaLattosio: MilkOff }
 
@@ -85,7 +76,7 @@ export default function Prodotti() {
                     <div className="principale">
                       <div className="nome">{p.nome}</div>
                       <div className="riga">
-                        <span className="etichetta salvia">{quanto(p)} a persona al giorno</span>
+                        <span className="etichetta salvia">{dose(p.quantitaBase, p.unita)} a persona al giorno</span>
                         {p.tag.filter((t) => ESIGENZE.includes(t)).map((t) => <span key={t} className="etichetta sabbia">{TAG[t]}</span>)}
                         {p.valoriNutrizionali?.energia !== undefined && (
                           <span className="etichetta">{p.valoriNutrizionali.energia.toLocaleString('it-IT')} kcal per 100 {aVolume(p) ? 'ml' : 'g'}</span>
@@ -140,13 +131,13 @@ export function FoglioProdotto({ valore, nuovo, cambia, chiudi, inCorso, onSalva
       <div className="campo">
         <span id="quantita-prodotto">Quantità a persona, al giorno</span>
         <div className="quantita-unita" role="group" aria-labelledby="quantita-prodotto">
-          <input className="numero" type="number" min="0.001" step="any" inputMode="decimal" aria-label="Quantità"
+          <input className="numero" type="number" min="0" step="any" inputMode="decimal" aria-label="Quantità"
             value={Number.isFinite(valore.quantitaBase) ? valore.quantitaBase : ''}
             onChange={(e) => cambia({ quantitaBase: e.target.valueAsNumber })} />
-          <Tendina etichetta="Unità di misura" classe="unita" valore={valore.unita} opzioni={UNITA_PER_ESTESO}
+          <Tendina etichetta="Misura" classe="unita" valore={valore.unita} gruppi={gruppiMisure(valore.quantitaBase)}
             onCambia={(unita) => cambia({ unita })} />
         </div>
-        <small>Quanto ne usa di solito una persona in un giorno.</small>
+        <small>Quanto ne usa di solito una persona in un giorno, a misure di casa. È anche la misura proposta quando entra in una ricetta.</small>
       </div>
       <Esigenze valori={valore.tag} onCambia={(tag) => cambia({ tag })} />
       <Valori valori={valore.valoriNutrizionali} perCento={aVolume(valore) ? '100 ml' : '100 g'}

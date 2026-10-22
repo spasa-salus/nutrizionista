@@ -593,37 +593,28 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .collegamento.scollegato { border-style: dashed; border-color: var(--sabbia); color: var(--sabbia); background: transparent; }
 .collegamento:hover { border-color: var(--salvia); }
-/* La dose (2 cucchiai) e sotto, con la misura di casa, quanto pesa: piu' piccolo, e' il dettaglio. */
+/* La dose, come si dice in cucina: 2 cucchiai. */
 .dose { flex: 0 0 236px; display: grid; gap: 6px; align-content: start; }
 .quantita-unita.piccola .numero { flex-basis: 80px; font-size: 17px; }
 .quantita-unita.piccola .tendina select { min-height: 46px; padding-left: 12px; padding-right: 46px; }
 .input[aria-invalid='true'], .quantita-unita:has(.numero[aria-invalid='true']) { border-color: var(--pomodoro); }
-.equivalente {
-  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
-  font-size: 13px; font-weight: 700; color: var(--inchiostro-tenue);
-}
-.equivalente input, .valore input {
+.valore input {
   width: 76px; min-height: 36px; padding: 4px 10px;
   border: 1.5px solid var(--bordo-campo); border-radius: var(--smusso-piccolo); background: var(--sfondo);
   color: var(--inchiostro); font-size: 15px; font-weight: 700; text-align: right;
   appearance: textfield; -moz-appearance: textfield;
 }
-.equivalente input::-webkit-inner-spin-button, .equivalente input::-webkit-outer-spin-button,
 .valore input::-webkit-inner-spin-button, .valore input::-webkit-outer-spin-button { appearance: none; margin: 0; }
-.equivalente input:focus-visible, .valore input:focus-visible {
+.valore input:focus-visible {
   outline: none; border-color: var(--salvia); box-shadow: 0 0 0 3px color-mix(in srgb, var(--salvia) 30%, transparent);
 }
-.equivalente input[aria-invalid='true'], .valore input[aria-invalid='true'] { border-color: var(--pomodoro); }
-.equivalente .tendina { flex: none; }
-.equivalente .tendina select { min-height: 36px; padding: 4px 38px 4px 12px; font-size: 14px; }
-.equivalente .tendina .freccia { right: 4px; width: 28px; height: 28px; }
+.valore input[aria-invalid='true'] { border-color: var(--pomodoro); }
 @container (max-width: 560px) {
   .ingrediente-riga { flex-wrap: wrap; }
   .ingrediente-riga .principale { flex: 1 1 calc(100% - 52px); order: 1; }
   .ingrediente-riga > .tondo { order: 2; }
   .dose { flex: 1 1 100%; order: 3; }
   .dose .quantita-unita { max-width: none; }
-  .equivalente { justify-content: flex-start; }
 }
 
 .esigenza.calcolata { cursor: default; text-align: center; }

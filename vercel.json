@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/mcp", "destination": "https://xbwkcdnlatpwqmiodrrb.supabase.co/functions/v1/admin/mcp/nutrizionista" },
+    { "source": "/mcp/:resto*", "destination": "https://xbwkcdnlatpwqmiodrrb.supabase.co/functions/v1/admin/mcp/nutrizionista/:resto*" },
+    {
+      "source": "/.well-known/:documento(oauth-protected-resource|oauth-authorization-server|openid-configuration)/mcp",
+      "destination": "https://xbwkcdnlatpwqmiodrrb.supabase.co/functions/v1/admin/mcp/.well-known/:documento/nutrizionista"
+    }
+  ]
+}

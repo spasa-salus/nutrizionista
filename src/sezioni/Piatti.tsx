@@ -8,7 +8,7 @@ import { BottoneElimina, Campo, BottoneNuovo, Cerca, Foglio, Intestazione, Piede
 type Utente = { id: string; email: string; nome_utente: string | null }
 
 type Piatto = {
-  id: string; utente_id: string; autore: string | null; email: string | null
+  id: string; utente_id: string; autore: string | null
   ricetta_id: string; ricetta_nome: string; foto: string; fotoUrl: string; didascalia: string
   creato_il: string; mi_piace: number; segnalazioni: number
   moderazione: Moderazione; motivo_moderazione: string | null; deciso_da: 'ai' | 'admin' | null

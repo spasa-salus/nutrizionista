@@ -16,6 +16,11 @@
   --bordo-campo: #8f8474;
   --su-pieno: var(--sfondo);
   --ombra: 0 18px 50px rgba(46, 42, 36, 0.18);
+  /* Serie dei grafici (Insights): blu, terracotta, verde acqua come nel pannello B2B, validate per
+     daltonismo su --sfondo. Salvia e terracotta del marchio insieme non passano. */
+  --serie-1: #2f6fb0;
+  --serie-2: #d0603a;
+  --serie-3: #2e9e7e;
 
   --smusso-piccolo: 14px;
   --smusso-medio: 22px;
@@ -39,6 +44,9 @@
   --marchio-terracotta: #e48f7b;
   --bordo-campo: #80776a;
   --ombra: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --serie-1: #3f84d0;
+  --serie-2: #d9663e;
+  --serie-3: #23a07f;
   color-scheme: dark;
 }
 
@@ -887,3 +895,83 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .testo-messaggio { white-space: pre-wrap; overflow-wrap: anywhere; }
 .link-messaggio { color: var(--terracotta); font-weight: 700; overflow-wrap: anywhere; }
 a.bottone { text-decoration: none; }
+
+/* ---------- Insights ---------- */
+
+.filtri-insight .tendina { flex: 0 1 230px; }
+.schede-insight { margin: 8px 0 4px; }
+.in-aggiornamento { opacity: 0.55; transition: opacity 0.2s; }
+.griglia-insight { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+.carta-insight {
+  min-width: 0; padding: 16px 18px; display: grid; gap: 12px; align-content: start;
+  background: var(--superficie); border-radius: var(--smusso-medio);
+}
+.carta-insight.larga { grid-column: 1 / -1; }
+.carta-insight.spenta { background: transparent; box-shadow: inset 0 0 0 1.5px var(--filetto); }
+.carta-insight h3 { margin: 0; font-size: 15px; font-weight: 800; }
+.nota-insight, .grafico-niente { margin: 0; }
+
+/* Numeri: etichetta sopra, cifra grande (proporzionale, non tabellare). */
+.cifre { margin: 0; display: grid; gap: 12px 16px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.cifre dt { font-size: 13px; color: var(--inchiostro-tenue); }
+.cifre dd { margin: 2px 0 0; font-size: 24px; font-weight: 800; line-height: 1.15; }
+
+/* Barre: etichetta, pista, valore in punta. Barre sottili, punta arrotondata, base dritta. */
+.barre { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.barre li { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr) auto; align-items: center; gap: 10px; font-size: 14px; }
+.etichetta-barra { overflow-wrap: anywhere; }
+.pista { height: 12px; }
+.barra-valore { display: block; height: 100%; min-width: 2px; background: var(--serie-1); border-radius: 0 4px 4px 0; }
+.valore-barra { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+
+/* Colonne: valore sul cappello, etichetta sotto. Pozzo ad altezza fissa, colonna dal fondo. */
+.colonne { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; align-items: stretch; }
+.colonne li { flex: 1 1 0; min-width: 0; display: grid; grid-template-rows: 160px auto; justify-items: center; gap: 4px; }
+.pozzo { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; border-bottom: 1px solid var(--filetto); }
+.colonna-valore { display: block; flex: none; width: min(100%, 24px); min-height: 2px; background: var(--serie-1); border-radius: 4px 4px 0 0; }
+.valore-colonna { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.etichetta-colonna { font-size: 12px; color: var(--inchiostro-tenue); text-align: center; overflow-wrap: anywhere; }
+
+/* Mappa giorni x ore: una tinta, piu' piena dove ce n'e' di piu'. */
+.mappa { border-collapse: separate; border-spacing: 2px; font-size: 11px; color: var(--inchiostro-tenue); }
+.mappa th { font-weight: 600; padding: 0 2px; text-align: center; }
+.mappa tbody th { text-align: left; padding-right: 6px; }
+.mappa td { width: 26px; height: 22px; border-radius: 4px; background: var(--sfondo); }
+.legenda-mappa { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; }
+.legenda-mappa .sfumatura { width: 90px; height: 10px; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--serie-1) 12%, var(--sfondo)), var(--serie-1)); }
+
+
+/* Linee: come il grafico della dashboard B2B (b2b/src/stile.css). */
+.legenda { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--inchiostro-tenue); }
+.legenda li { display: flex; align-items: center; gap: 8px; }
+.chiave { flex: none; display: inline-block; width: 16px; height: 3px; border-radius: 2px; }
+.grafico-linee { position: relative; min-width: 0; touch-action: pan-y; border-radius: 6px; background: var(--sfondo); }
+.grafico-linee svg { position: absolute; inset: 0; display: block; overflow: visible; }
+.grafico-linee .griglia { stroke: var(--filetto); stroke-width: 1; opacity: 0.6; }
+.grafico-linee .asse-zero { stroke: var(--filetto); stroke-width: 1; }
+.grafico-linee .etichetta-asse { font-size: 11px; fill: var(--inchiostro-tenue); font-variant-numeric: tabular-nums; }
+.grafico-linee .linea { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.grafico-linee .punto { stroke: var(--sfondo); stroke-width: 2; }
+.grafico-linee .mirino { stroke: var(--inchiostro-tenue); stroke-width: 1; opacity: 0.5; }
+.grafico-linee .bersaglio { fill: transparent; cursor: crosshair; }
+.grafico-vuoto { position: absolute; inset: 0 0 40px; display: grid; place-items: center; margin: 0; color: var(--inchiostro-tenue); font-size: 14px; pointer-events: none; }
+.fumetto-grafico {
+  position: absolute; top: 0; z-index: 2; transform: translateX(14px); pointer-events: none;
+  display: grid; gap: 3px; min-width: 120px; padding: 8px 12px;
+  background: var(--sfondo); border: 1px solid var(--filetto); border-radius: var(--smusso-piccolo);
+  box-shadow: 0 6px 18px rgba(46, 42, 36, 0.14); font-size: 13px;
+}
+.fumetto-grafico.a-sinistra { transform: translateX(calc(-100% - 14px)); }
+.fumetto-grafico .quando { font-size: 12px; font-weight: 700; color: var(--inchiostro-tenue); }
+.riga-fumetto { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.riga-fumetto b { min-width: 2ch; font-size: 14px; font-variant-numeric: tabular-nums; }
+.riga-fumetto span:last-child { color: var(--inchiostro-tenue); }
+.apribile summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--inchiostro-tenue); }
+.scorrevole { position: relative; overflow-x: auto; }
+.tabella-giorni { max-height: 280px; overflow-y: auto; margin-top: 8px; }
+.tabella { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabella th, .tabella td { padding: 6px 10px; border-bottom: 1px solid var(--filetto); }
+.numeri th:not(:first-child), .numeri td { text-align: right; font-variant-numeric: tabular-nums; }
+.numeri tbody th { text-align: left; font-weight: 600; }
+.numeri thead th { position: sticky; top: 0; background: var(--superficie); text-align: right; }
+.numeri thead th:first-child { text-align: left; }

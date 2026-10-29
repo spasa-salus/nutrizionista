@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react'
-import { Columns3, BookOpen, Link2, LogOut, Mail, MessageCircleQuestion, Moon, Package, Camera, ShoppingBasket, Sun } from 'lucide-react'
+import { ChartColumn, Columns3, BookOpen, Link2, LogOut, Mail, MessageCircleQuestion, Moon, Package, Camera, ShoppingBasket, Sun } from 'lucide-react'
 import { chiama, salvaSessione, sessione } from './api'
 import { FornitoreContenuto, useNotifica } from './ui'
 import { AutorizzaMcp, BottoneMcp, richiestaMcp } from './mcp'
@@ -11,6 +11,7 @@ import Associazioni from './sezioni/Associazioni'
 import Piatti from './sezioni/Piatti'
 import Domande from './sezioni/Domande'
 import Messaggi, { type Messaggio } from './sezioni/Messaggi'
+import Insights from './sezioni/Insights'
 
 const SEZIONI = [
   { reparto: 'Contenuto', voci: [
@@ -27,6 +28,9 @@ const SEZIONI = [
   ] },
   { reparto: 'Sito', voci: [
     { id: 'messaggi', nome: 'Messaggi', icona: Mail, vista: Messaggi },
+  ] },
+  { reparto: 'Dati', voci: [
+    { id: 'insights', nome: 'Insights', icona: ChartColumn, vista: Insights },
   ] },
 ]
 // L'editor a colonne sta a parte: in cima al menu, staccato dalle sezioni, e prende tutta la larghezza.

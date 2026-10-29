@@ -4,7 +4,8 @@ import { cerca, data } from '../dominio'
 import { BottoneElimina, Cerca, Intestazione, Stato, useElenco, useNotifica } from '../ui'
 
 // Le domande le scrivono solo gli utenti dall'app: qui si leggono e, se serve, si eliminano.
-type Domanda = { id: string; utente_id: string; testo: string; creata_il: string; email: string | null; nome_utente: string | null }
+// Col nome nella community, mai l'email: chi scrive resta anonimo anche per il pannello.
+type Domanda = { id: string; utente_id: string; testo: string; creata_il: string; nome_utente: string | null }
 
 export default function Domande() {
   const { righe, errore, ricarica } = useElenco<Domanda>('domande.elenco')
@@ -12,7 +13,7 @@ export default function Domande() {
   const [inCorso, impostaInCorso] = useState(false)
   const notifica = useNotifica()
 
-  const domande = cerca(righe ?? [], filtro, (d) => `${d.testo} ${d.email ?? ''} ${d.nome_utente ?? ''}`)
+  const domande = cerca(righe ?? [], filtro, (d) => `${d.testo} ${d.nome_utente ?? ''}`)
 
   async function elimina(id: string) {
     impostaInCorso(true)
@@ -37,7 +38,7 @@ export default function Domande() {
             <article key={d.id} className="foglio-quaderno">
               <div className="testo">{d.testo}</div>
               <div className="firma">
-                <span>{d.nome_utente ? `@${d.nome_utente}` : d.email ?? 'utente eliminato'}</span>
+                <span>{d.nome_utente ? `@${d.nome_utente}` : 'senza nome utente'}</span>
                 <span>·</span>
                 <span>{data(d.creata_il)}</span>
               </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Carrot, Check, ChevronRight, Croissant, CupSoda, Droplet, Drumstick, LayoutGrid, type LucideIcon, Milk, MilkOff,
   Package, Salad, Snowflake, Vegan, Wheat, WheatOff,
@@ -25,14 +25,27 @@ export const ICONE_ESIGENZA: Record<string, LucideIcon> = { vegano: Vegan, veget
  * Editor): `apri(p)` per modificarlo, `nuovo()` per crearne uno, `foglio` va messo nella pagina.
  */
 export function useFoglioProdotto() {
-  const { salva, elimina } = useContenuto()
+  const { contenuto, salva, elimina } = useContenuto()
   const { bozza, apri, chiudi, cambia, inCorso, esegui } = useBozza<Prodotto>()
+  // Chi ha chiesto il prodotto nuovo (un ingrediente di una ricetta) lo riceve appena pubblicato.
+  const poiCreato = useRef<((p: Prodotto) => void) | undefined>(undefined)
   const foglio = bozza && (
     <FoglioProdotto valore={bozza.valore} nuovo={bozza.nuovo} cambia={cambia} chiudi={chiudi} inCorso={inCorso}
-      onSalva={() => esegui(() => salva('prodotti', bozza.valore, bozza.nuovo))}
+      onSalva={() => esegui(async () => {
+        const ok = await salva('prodotti', bozza.valore, bozza.nuovo)
+        if (ok && bozza.nuovo) poiCreato.current?.(bozza.valore)
+        return ok
+      })}
       onElimina={bozza.nuovo ? undefined : () => esegui(() => elimina('prodotti', bozza.valore.id))} />
   )
-  return { apri: (p: Prodotto) => apri(p), nuovo: () => apri(VUOTO, true), foglio }
+  return {
+    apri: (p: Prodotto) => apri(p),
+    nuovo: (nome = '', poi?: (p: Prodotto) => void) => {
+      poiCreato.current = poi
+      apri({ ...VUOTO, nome, id: nome ? idDaNome(nome, contenuto?.prodotti.map((p) => p.id) ?? [], 'prodotto') : '' }, true)
+    },
+    foglio,
+  }
 }
 
 export default function Prodotti() {
@@ -56,7 +69,7 @@ export default function Prodotti() {
     <>
       <Intestazione titolo="Prodotti"
         sottotitolo={`${contenuto?.prodotti.length ?? 0} prodotti nel catalogo, divisi per reparto · ${conValori} con i valori nutrizionali`}
-        azione={<BottoneNuovo testo="Nuovo prodotto" onClick={prodotto.nuovo} />} />
+        azione={<BottoneNuovo testo="Nuovo prodotto" onClick={() => prodotto.nuovo()} />} />
       <div className="barra">
         <Cerca valore={filtro} onCambia={impostaFiltro} segnaposto="Cerca un prodotto" />
         <Tendina etichetta="Reparto" classe="compatta" valore={categoria} onCambia={impostaCategoria}

@@ -260,7 +260,7 @@ export default function Ricette() {
             onElimina={bozza.nuovo ? undefined : () => esegui(() => elimina('ricette', bozza.valore.id))} />}>
           <ModuloRicetta valore={bozza.valore} nuovo={bozza.nuovo} cambia={cambia}
             foto={fotoPerRicetta(piatti, true).get(bozza.valore.id) ?? []} onFotoCambiate={ricaricaPiatti}
-            onModificaProdotto={prodotto.apri} />
+            onModificaProdotto={prodotto.apri} onNuovoProdotto={prodotto.nuovo} />
         </Foglio>
       )}
       {prodotto.foglio}
@@ -272,9 +272,9 @@ export default function Ricette() {
  * Tutti i campi di una ricetta: nel foglio della sezione Ricette e nella terza colonna dell'Editor.
  * `foto` sono tutti i piatti della community fatti con la ricetta, anche quelli non ancora visibili.
  */
-export function ModuloRicetta({ valore, nuovo, cambia, foto, onFotoCambiate, onModificaProdotto }: {
+export function ModuloRicetta({ valore, nuovo, cambia, foto, onFotoCambiate, onModificaProdotto, onNuovoProdotto }: {
   valore: Ricetta; nuovo: boolean; cambia: (m: Partial<Ricetta>) => void
-  foto: Piatto[]; onFotoCambiate: () => void; onModificaProdotto: (p: Prodotto) => void
+  foto: Piatto[]; onFotoCambiate: () => void; onModificaProdotto: (p: Prodotto) => void; onNuovoProdotto: NuovoProdotto
 }) {
   const { contenuto } = useContenuto()
   const Icona = iconaPasto(valore.momento)
@@ -323,7 +323,8 @@ export function ModuloRicetta({ valore, nuovo, cambia, foto, onFotoCambiate, onM
           valori={valore.carrelli} onCambia={(carrelli) => cambia({ carrelli })} />
         <small>Chi ha scelto uno di questi carrelli si vede proporre la ricetta.</small>
       </div>
-      <Ingredienti righe={valore.ingredienti} onCambia={(ingredienti) => cambia({ ingredienti })} onModificaProdotto={onModificaProdotto} />
+      <Ingredienti righe={valore.ingredienti} onCambia={(ingredienti) => cambia({ ingredienti })}
+        onModificaProdotto={onModificaProdotto} onNuovoProdotto={onNuovoProdotto} />
       <EsigenzeRicetta ingredienti={valore.ingredienti} />
       <Passaggi righe={valore.passaggi} onCambia={(passaggi) => cambia({ passaggi })} />
       <FotoCommunity piatti={foto} ricetta={nuovo ? null : valore} onCambiate={onFotoCambiate} />
@@ -331,13 +332,16 @@ export function ModuloRicetta({ valore, nuovo, cambia, foto, onFotoCambiate, onM
   )
 }
 
+/** Apre il foglio di un prodotto nuovo sopra la ricetta; `poi` lo riceve appena pubblicato. */
+type NuovoProdotto = (nome: string, poi: (p: Prodotto) => void) => void
+
 /**
  * Un prodotto del catalogo da cercare per nome: per aggiungere un ingrediente e per collegarne
- * uno scritto a mano. Su, giu' e invio scelgono senza mouse.
+ * uno scritto a mano. Su, giu' e invio scelgono senza mouse. Se manca, lo si crea da qui.
  */
-function ScegliProdotto({ children, classe, etichetta, onScegli, onTesto, onScollega }: {
+function ScegliProdotto({ children, classe, etichetta, onScegli, onTesto, onScollega, onNuovo }: {
   children: ReactNode; classe: string; etichetta: string
-  onScegli: (p: Prodotto) => void; onTesto?: (t: string) => void; onScollega?: () => void
+  onScegli: (p: Prodotto) => void; onTesto?: (t: string) => void; onScollega?: () => void; onNuovo: (nome: string) => void
 }) {
   const { contenuto } = useContenuto()
   const { aperta, impostaAperta, contenitore, alEsc } = useComparsa()
@@ -379,6 +383,10 @@ function ScegliProdotto({ children, classe, etichetta, onScegli, onTesto, onScol
                 </button>
               )
             })}
+            <button type="button" className="voce-prodotto-scelta a-mano" onClick={() => { chiudi(); onNuovo(filtro.trim()) }}>
+              <Plus size={16} aria-hidden /><span className="nome">{filtro.trim() ? `Nuovo prodotto «${filtro.trim()}»` : 'Nuovo prodotto'}</span>
+              <span className="tenue piccolo">nel catalogo</span>
+            </button>
             {onTesto && filtro.trim() && (
               <button type="button" className="voce-prodotto-scelta a-mano" onClick={() => { onTesto(filtro.trim()); impostaAperta(false) }}>
                 <Plus size={16} aria-hidden /><span className="nome">Scrivi a mano «{filtro.trim()}»</span><span className="tenue piccolo">non va in lista</span>
@@ -397,8 +405,8 @@ function ScegliProdotto({ children, classe, etichetta, onScegli, onTesto, onScol
   )
 }
 
-function Ingredienti({ righe, onCambia, onModificaProdotto }: {
-  righe: Ingrediente[]; onCambia: (r: Ingrediente[]) => void; onModificaProdotto: (p: Prodotto) => void
+function Ingredienti({ righe, onCambia, onModificaProdotto, onNuovoProdotto }: {
+  righe: Ingrediente[]; onCambia: (r: Ingrediente[]) => void; onModificaProdotto: (p: Prodotto) => void; onNuovoProdotto: NuovoProdotto
 }) {
   const { contenuto } = useContenuto()
   const perId = new Map(contenuto!.prodotti.map((p) => [p.id, p]))
@@ -414,6 +422,7 @@ function Ingredienti({ righe, onCambia, onModificaProdotto }: {
   })
   const sostituisci = (i: number, riga: Ingrediente) => onCambia(righe.map((r, n) => n === i ? riga : r))
   const aggiorna = (i: number, modifica: Partial<Ingrediente>) => sostituisci(i, { ...righe[i], ...modifica })
+  const collega = (i: number, p: Prodotto) => aggiorna(i, { prodottoID: p.id, ...(righe[i].nome.trim() ? {} : { nome: p.nome }) })
   const aggiungi = (riga: Ingrediente) => { daSelezionare.current = righe.length; onCambia([...righe, riga]) }
 
   return (
@@ -433,7 +442,8 @@ function Ingredienti({ righe, onCambia, onModificaProdotto }: {
                   value={r.nome} aria-invalid={!r.nome.trim() && !r.prodottoID} onChange={(e) => aggiorna(i, { nome: e.target.value })} />
                 <div className="collegamenti">
                   <ScegliProdotto etichetta={`Prodotto dell'ingrediente ${i + 1}`} classe={`collegamento${prodotto ? '' : ' scollegato'}`}
-                    onScegli={(p) => aggiorna(i, { prodottoID: p.id, ...(r.nome.trim() ? {} : { nome: p.nome }) })}
+                    onScegli={(p) => collega(i, p)}
+                    onNuovo={(nome) => onNuovoProdotto(nome || r.nome.trim(), (p) => collega(i, p))}
                     onScollega={prodotto ? () => aggiorna(i, { prodottoID: undefined }) : undefined}>
                     {prodotto
                       ? <><Link2 size={14} aria-hidden /> {prodotto.nome}</>
@@ -466,6 +476,7 @@ function Ingredienti({ righe, onCambia, onModificaProdotto }: {
       <div>
         <ScegliProdotto etichetta="Aggiungi un ingrediente" classe="bottone secondario compatto"
           onScegli={(p) => aggiungi(ingredienteDa(p))}
+          onNuovo={(nome) => onNuovoProdotto(nome, (p) => aggiungi(ingredienteDa(p)))}
           onTesto={(nome) => aggiungi({ nome, quantita: 1, unita: 'cucchiaio' })}>
           <Plus size={16} aria-hidden /> Aggiungi ingrediente
         </ScegliProdotto>

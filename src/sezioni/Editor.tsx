@@ -221,7 +221,8 @@ export default function Editor() {
                 </header>
                 <div className="corpo-colonna">
                   <ModuloRicetta valore={aperta.ricetta} nuovo={aperta.nuova} cambia={cambia}
-                    foto={foto.get(aperta.ricetta.id) ?? []} onFotoCambiate={piatti.ricarica} onModificaProdotto={prodotto.apri} />
+                    foto={foto.get(aperta.ricetta.id) ?? []} onFotoCambiate={piatti.ricarica} onModificaProdotto={prodotto.apri}
+                    onNuovoProdotto={prodotto.nuovo} />
                 </div>
                 <footer className="piede-colonna">
                   {!aperta.nuova && <BottoneElimina testo="Elimina ricetta" disabilitato={inCorso} onConferma={eliminaRicetta} />}
